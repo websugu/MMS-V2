@@ -10,6 +10,16 @@ export async function renderNavbar() {
   if (!navbar) return;
 
   const user = auth.currentUser;
+
+  // Calculate guest cart count
+  let guestCartCount = 0;
+  if (!user) {
+    try {
+      const guestCart = JSON.parse(localStorage.getItem("guestCart") || "[]");
+      guestCartCount = guestCart.reduce((sum, item) => sum + item.quantity, 0);
+    } catch (e) { /* ignore */ }
+  }
+
   if (!user) {
     navbar.innerHTML = `
       <nav class="main-nav">
@@ -29,8 +39,15 @@ export async function renderNavbar() {
           </div>
 
           <div class="nav-profile">
+            <button id="install-btn" class="nav-logout" onclick="installApp()" title="Installer l'app" style="display:none;">
+              <i class="fas fa-download"></i>
+            </button>
+            <a href="cart.html" class="nav-link ${isActive('cart.html')}">
+              <i class="fas fa-shopping-cart"></i>
+              ${guestCartCount > 0 ? `<span class="nav-badge">${guestCartCount}</span>` : ''}
+            </a>
             <a href="login.html" class="nav-link">
-              <i class="fas fa-sign-in-alt"></i> Se connecter
+              <i class="fas fa-user-circle"></i>
             </a>
           </div>
         </div>
@@ -69,6 +86,9 @@ export async function renderNavbar() {
         </div>
 
         <div class="nav-profile">
+            <button id="install-btn" class="nav-logout" onclick="installApp()" title="Installer l'app" style="display:none;">
+              <i class="fas fa-download"></i>
+            </button>
         <div class="card-display">
             <a href="cart.html" class="nav-link ${isActive('cart.html')}">
               <i class="fas fa-shopping-cart"></i>
@@ -116,10 +136,41 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// PWA Install handling
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const installBtn = document.getElementById('install-btn');
+  if (installBtn) installBtn.style.display = 'flex';
+});
+
+// Install app function
+window.installApp = async function() {
+  if (!deferredPrompt) return;
+  
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  if (outcome === 'accepted') {
+    deferredPrompt = null;
+    const installBtn = document.getElementById('install-btn');
+    if (installBtn) installBtn.style.display = 'none';
+  }
+};
+
+// App installed
+window.addEventListener('appinstalled', () => {
+  deferredPrompt = null;
+  const installBtn = document.getElementById('install-btn');
+  if (installBtn) installBtn.style.display = 'none';
+});
+
 // Global logout
 window.logout = function() {
   auth.signOut().then(() => {
     window.location.href = "login.html";
   });
 };
+
 
